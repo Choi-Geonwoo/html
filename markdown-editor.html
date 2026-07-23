@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Markdown Editor</title>
+
+<style>
+  *{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+  }
+
+  body{
+    height:100vh;
+    display:flex;
+    flex-direction:column;
+    font-family:Consolas,"Malgun Gothic";
+    background:#ffffff;
+    color:#2d3436;
+  }
+
+  header{
+    height:50px;
+    background:#2d3436;
+    color:#ffffff;
+    display:flex;
+    align-items:center;
+    padding:10px;
+    gap:10px;
+    flex-shrink:0;
+  }
+
+  header button{
+    background:transparent;
+    color:#ffffff;
+    border:1px solid rgba(255,255,255,0.3);
+    padding:8px 14px;
+    cursor:pointer;
+    border-radius:4px;
+  }
+
+  header button:hover{
+    background:rgba(255,255,255,0.1);
+  }
+
+  main{
+    flex:1;
+    display:flex;
+    min-height:0;
+  }
+
+  #editor{
+    width:50%;
+    resize:none;
+    border:none;
+    outline:none;
+    padding:20px;
+    font-size:15px;
+    font-family:Consolas,monospace;
+  }
+
+  #preview{
+    width:50%;
+    border-left:1px solid #ddd;
+    padding:20px;
+    overflow:auto;
+  }
+
+  #preview h1{
+    border-bottom:2px solid #ddd;
+    padding-bottom:10px;
+    margin-bottom:20px;
+  }
+
+  #preview h2{
+    border-bottom:1px solid #ddd;
+    margin-top:20px;
+    margin-bottom:15px;
+  }
+
+  #preview p{
+    line-height:1.8;
+    margin:10px 0;
+  }
+
+  #preview pre{
+    background:#2d2d2d;
+    color:#ffffff;
+    padding:15px;
+    border-radius:5px;
+    overflow:auto;
+  }
+
+  #preview code{
+    background:#f1f1f1;
+    padding:2px 5px;
+    border-radius:4px;
+  }
+
+  #preview pre code{
+    background:none;
+    padding:0;
+  }
+
+  #preview blockquote{
+    border-left:5px solid #4CAF50;
+    padding-left:10px;
+    color:#666;
+    margin:10px 0;
+  }
+
+  #preview table{
+    border-collapse:collapse;
+    width:100%;
+  }
+
+  #preview table th,
+  #preview table td{
+    border:1px solid #ddd;
+    padding:8px;
+  }
+
+  #preview img{
+    max-width:100%;
+  }
+
+  #preview ul,
+  #preview ol{
+    margin-left:20px;
+    margin-bottom:10px;
+  }
+
+  #toolbar{
+    display:flex;
+    gap:5px;
+    padding:10px;
+    background:#f3f3f3;
+    border-bottom:1px solid #ddd;
+    flex-shrink:0;
+  }
+
+  #toolbar button{
+    padding:6px 10px;
+    cursor:pointer;
+    min-width:45px;
+    background:#ffffff;
+    border:1px solid #ddd;
+    border-radius:4px;
+  }
+
+  #toolbar button:hover{
+    background:#e9e9e9;
+  }
+
+  #fileInput{
+    display:none;
+  }
+
+  /* ---- 단축키 설정 모달 ---- */
+
+  #shortcutOverlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.5);
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+  }
+
+  #shortcutOverlay.open{
+    display:flex;
+  }
+
+  #shortcutPanel{
+    background:#ffffff;
+    width:460px;
+    max-width:90vw;
+    max-height:80vh;
+    border-radius:8px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+
+  #shortcutPanel header{
+    background:#2d3436;
+    color:#ffffff;
+    height:auto;
+    padding:14px 18px;
+    font-size:16px;
+    font-weight:bold;
+  }
+
+  #shortcutList{
+    padding:10px 18px;
+    overflow:auto;
+    flex:1;
+  }
+
+  .shortcut-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid #eee;
+    gap:10px;
+  }
+
+  .shortcut-row .label{
+    font-size:14px;
+    color:#2d3436;
+  }
+
+  .shortcut-row input{
+    width:150px;
+    text-align:center;
+    padding:6px 8px;
+    border:1px solid #ddd;
+    border-radius:4px;
+    font-family:Consolas,monospace;
+    cursor:pointer;
+    background:#f8f8f8;
+  }
+
+  .shortcut-row input.recording{
+    border-color:#4CAF50;
+    background:#eaf7ea;
+  }
+
+  #shortcutFooter{
+    padding:12px 18px;
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    border-top:1px solid #ddd;
+  }
+
+  #shortcutFooter button{
+    padding:8px 14px;
+    cursor:pointer;
+    border:1px solid #ddd;
+    border-radius:4px;
+    background:#ffffff;
+  }
+
+  #shortcutFooter button:hover{
+    background:#e9e9e9;
+  }
+
+  #shortcutFooter button.primary{
+    background:#2d3436;
+    color:#ffffff;
+    border-color:#2d3436;
+  }
+
+  #shortcutFooter button.primary:hover{
+    background:#1c2022;
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+
+<header>
+  <button id="openBtn">파일열기</button>
+  <button id="saveBtn">저장</button>
+  <button id="htmlBtn">HTML</button>
+  <button id="shortcutBtn">단축키 설정</button>
+  <input type="file" id="fileInput" accept=".md,.markdown,.txt">
+</header>
+
+<div id="toolbar">
+  <button onclick="wrap('**','**')"><b>B</b></button>
+  <button onclick="wrap('*','*')"><i>I</i></button>
+  <button onclick="wrap('~~','~~')"><s>S</s></button>
+  <button onclick="heading(1)">H1</button>
+  <button onclick="heading(2)">H2</button>
+  <button onclick="heading(3)">H3</button>
+  <button onclick="insert('- ')">•</button>
+  <button onclick="insert('1. ')">1.</button>
+  <button onclick="insert('- [ ] ')">☑</button>
+  <button onclick="codeBlock()">&lt;/&gt;</button>
+  <button onclick="table()">표</button>
+  <button onclick="link()">링크</button>
+  <button onclick="image()">이미지</button>
+</div>
+
+<main>
+<textarea id="editor"># Markdown
+
+여기에 입력하세요.
+</textarea>
+<div id="preview"></div>
+</main>
+
+<!-- 단축키 설정 모달 -->
+<div id="shortcutOverlay">
+  <div id="shortcutPanel">
+    <header>단축키 설정</header>
+    <div id="shortcutList"></div>
+    <div id="shortcutFooter">
+      <button id="resetShortcuts">기본값으로 초기화</button>
+      <button id="closeShortcuts" class="primary">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const editor = document.getElementById("editor");
+const preview = document.getElementById("preview");
+const fileInput = document.getElementById("fileInput");
+
+function render(){
+  preview.innerHTML = marked.parse(editor.value);
+}
+
+editor.addEventListener("input", render);
+render();
+
+// ---- 서식 삽입 함수 ----
+
+function wrap(left, right){
+  const start = editor.selectionStart;
+  const end = editor.selectionEnd;
+  const text = editor.value;
+  const selected = text.substring(start, end);
+
+  editor.value =
+    text.substring(0, start)
+    + left
+    + selected
+    + right
+    + text.substring(end);
+
+  editor.selectionStart = start + left.length;
+  editor.selectionEnd = start + left.length + selected.length;
+
+  render();
+  editor.focus();
+}
+
+function heading(level){
+  insert("#".repeat(level) + " ");
+}
+
+function insert(str){
+  const pos = editor.selectionStart;
+  const text = editor.value;
+
+  editor.value =
+    text.substring(0, pos)
+    + str
+    + text.substring(pos);
+
+  editor.selectionStart = editor.selectionEnd = pos + str.length;
+
+  render();
+  editor.focus();
+}
+
+function codeBlock(){
+  insert("```javascript\n\n```\n");
+}
+
+function table(){
+  insert(
+`|제목1|제목2|
+|---|---|
+|내용|내용|
+
+`);
+}
+
+function link(){
+  insert("[링크이름](https://)");
+}
+
+function image(){
+  insert("![이미지](image.png)");
+}
+
+// ---- 파일 열기 / 저장 ----
+
+function openFile(){
+  fileInput.click();
+}
+
+fileInput.addEventListener("change", function(){
+  const file = fileInput.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    editor.value = e.target.result;
+    render();
+  };
+  reader.readAsText(file);
+
+  fileInput.value = "";
+});
+
+function downloadMarkdown(){
+  const blob = new Blob([editor.value], { type: "text/markdown" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "document.md";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function downloadHtml(){
+  const html =
+`<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>document</title>
+</head>
+<body>
+${preview.innerHTML}
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "document.html";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---- 헤더 버튼 연결 ----
+
+document.getElementById("openBtn").addEventListener("click", openFile);
+document.getElementById("saveBtn").addEventListener("click", downloadMarkdown);
+document.getElementById("htmlBtn").addEventListener("click", downloadHtml);
+
+// ---- 사용자 지정 단축키 ----
+
+// 각 동작과 기본 단축키 정의. 사용자는 아래 shortcuts 객체를 설정 창에서 변경할 수 있음(세션 동안 유지).
+const shortcutActions = [
+  { id:"bold",      label:"굵게",         action: () => wrap("**","**"),  default:"ctrl+b" },
+  { id:"italic",    label:"기울임",       action: () => wrap("*","*"),    default:"ctrl+i" },
+  { id:"strike",    label:"취소선",       action: () => wrap("~~","~~"),  default:"ctrl+shift+s" },
+  { id:"h1",        label:"제목1",        action: () => heading(1),       default:"alt+1" },
+  { id:"h2",        label:"제목2",        action: () => heading(2),       default:"alt+2" },
+  { id:"h3",        label:"제목3",        action: () => heading(3),       default:"alt+3" },
+  { id:"ul",        label:"글머리기호",   action: () => insert("- "),     default:"ctrl+shift+8" },
+  { id:"ol",        label:"번호목록",     action: () => insert("1. "),    default:"ctrl+shift+7" },
+  { id:"checklist", label:"체크박스",     action: () => insert("- [ ] "), default:"" },
+  { id:"code",      label:"코드블록",     action: () => codeBlock(),      default:"ctrl+shift+c" },
+  { id:"table",     label:"표",           action: () => table(),          default:"" },
+  { id:"link",      label:"링크",         action: () => link(),           default:"ctrl+k" },
+  { id:"image",     label:"이미지",       action: () => image(),          default:"" },
+  { id:"save",      label:"저장",         action: () => downloadMarkdown(), default:"ctrl+s" }
+];
+
+// 현재 활성 단축키 맵 (key 문자열 -> action). 브라우저 저장소를 쓰지 않고 메모리에만 유지됨.
+let shortcuts = {};
+
+function resetShortcutsToDefault(){
+  shortcuts = {};
+  shortcutActions.forEach(a => {
+    if(a.default) shortcuts[a.default] = a.id;
+  });
+}
+resetShortcutsToDefault();
+
+// 이벤트로부터 "ctrl+shift+k" 같은 표준 키 문자열 생성
+function eventToKeyString(e){
+  const parts = [];
+  if(e.ctrlKey || e.metaKey) parts.push("ctrl");
+  if(e.altKey) parts.push("alt");
+  if(e.shiftKey) parts.push("shift");
+
+  const key = e.key.toLowerCase();
+  if(!["control","alt","shift","meta"].includes(key)){
+    parts.push(key);
+  }
+
+  return parts.join("+");
+}
+
+editor.addEventListener("keydown", function(e){
+  const keyString = eventToKeyString(e);
+  const actionId = shortcuts[keyString];
+
+  if(actionId){
+    const found = shortcutActions.find(a => a.id === actionId);
+    if(found){
+      e.preventDefault();
+      found.action();
+    }
+  }
+});
+
+// ---- 단축키 설정 모달 ----
+
+const shortcutOverlay = document.getElementById("shortcutOverlay");
+const shortcutList = document.getElementById("shortcutList");
+
+function keyStringForAction(actionId){
+  return Object.keys(shortcuts).find(k => shortcuts[k] === actionId) || "";
+}
+
+function formatKeyString(str){
+  if(!str) return "설정 안 됨";
+  return str
+    .split("+")
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1))
+    .join("+");
+}
+
+function renderShortcutList(){
+  shortcutList.innerHTML = "";
+
+  shortcutActions.forEach(a => {
+    const row = document.createElement("div");
+    row.className = "shortcut-row";
+
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = a.label;
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.readOnly = true;
+    input.value = formatKeyString(keyStringForAction(a.id));
+    input.dataset.actionId = a.id;
+
+    input.addEventListener("click", function(){
+      startRecording(input);
+    });
+
+    row.appendChild(label);
+    row.appendChild(input);
+    shortcutList.appendChild(row);
+  });
+}
+
+function startRecording(input){
+  // 다른 입력창이 녹화 중이면 취소
+  document.querySelectorAll(".shortcut-row input.recording").forEach(el => {
+    el.classList.remove("recording");
+    el.value = formatKeyString(keyStringForAction(el.dataset.actionId));
+  });
+
+  input.classList.add("recording");
+  input.value = "키를 누르세요...";
+
+  function onKeydown(e){
+    e.preventDefault();
+
+    if(e.key === "Escape"){
+      finish();
+      input.value = formatKeyString(keyStringForAction(input.dataset.actionId));
+      return;
+    }
+
+    const keyString = eventToKeyString(e);
+
+    // 수정자 키만 눌린 경우는 무시하고 계속 대기
+    if(!keyString || ["ctrl","alt","shift"].includes(keyString)) return;
+
+    // 다른 동작에 이미 배정된 단축키면 그 동작에서 제거(중복 방지)
+    if(shortcuts[keyString]) delete shortcuts[keyString];
+
+    // 이 동작에 배정되어 있던 기존 단축키 제거
+    const prevKey = keyStringForAction(input.dataset.actionId);
+    if(prevKey) delete shortcuts[prevKey];
+
+    shortcuts[keyString] = input.dataset.actionId;
+
+    finish();
+    renderShortcutList();
+  }
+
+  function finish(){
+    input.removeEventListener("keydown", onKeydown);
+    input.classList.remove("recording");
+  }
+
+  input.addEventListener("keydown", onKeydown);
+}
+
+document.getElementById("shortcutBtn").addEventListener("click", function(){
+  renderShortcutList();
+  shortcutOverlay.classList.add("open");
+});
+
+document.getElementById("closeShortcuts").addEventListener("click", function(){
+  shortcutOverlay.classList.remove("open");
+  editor.focus();
+});
+
+document.getElementById("resetShortcuts").addEventListener("click", function(){
+  resetShortcutsToDefault();
+  renderShortcutList();
+});
+
+shortcutOverlay.addEventListener("click", function(e){
+  if(e.target === shortcutOverlay){
+    shortcutOverlay.classList.remove("open");
+    editor.focus();
+  }
+});
+
+// ---- Tab 들여쓰기 ----
+
+editor.addEventListener("keydown", function(e){
+  if(e.key !== "Tab") return;
+
+  e.preventDefault();
+
+  const start = this.selectionStart;
+  const end = this.selectionEnd;
+
+  if(e.shiftKey){
+    // Shift+Tab: 들여쓰기 제거
+    const before = this.value.substring(0, start);
+
+    if(before.endsWith("    ")){
+      this.value =
+        this.value.substring(0, start - 4)
+        + this.value.substring(start);
+
+      this.selectionStart = this.selectionEnd = start - 4;
+    }
+  } else {
+    // Tab: 들여쓰기 추가
+    this.setRangeText("    ", start, end, "end");
+  }
+
+  render();
+});
+</script>
+
+</body>
+</html>
